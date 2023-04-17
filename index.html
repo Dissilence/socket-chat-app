@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+  </head>
+  <body>
+    <ul id="messages"></ul>
+    <form id="chat-form">
+      <input id="message-input" autocomplete="off" /><button>Send</button>
+    </form>
+    <div id="typing-message"></div>
+    <div id="online-users"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+      $(function () {
+        const socket = io();
+        let username;
+
+        function setUsername() {
+          username = prompt("Please enter your username:");
+          if (!username) {
+            setUsername();
+          } else {
+            socket.emit("set username", username);
+          }
+        }
+
+        setUsername();
+
+        $("#chat-form").submit(function (e) {
+          e.preventDefault();
+          const message = $("#message-input").val();
+          if (message.trim() !== "") {
+            socket.emit("chat message", message);
+            $("#message-input").val("");
+          }
+        });
+
+        socket.on("chat message", function (data) {
+          const { username, message } = data;
+          const listItem = $("<li></li>");
+          listItem.text(`${username}: ${message}`);
+          $("#messages").append(listItem);
+          $("#typing-message").text("");
+        });
+
+        $("#message-input").on("input", function () {
+          const message = $("#message-input").val();
+          if (message.trim() !== "") {
+            socket.emit("user typing");
+          } else {
+            socket.emit("user stopped typing");
+          }
+        });
+
+        socket.on("user typing", function (username) {
+          $("#typing-message").text(`${username} is typing...`);
+        });
+
+        socket.on("user stopped typing", function (username) {
+          $("#typing-message").text("");
+        });
+
+        socket.on("user joined", function (data) {
+          const { username, onlineUsers } = data;
+          const userListItem = $("<li></li>");
+          userListItem.text(username);
+          userListItem.attr("id", `user-${username}`);
+          $("#online-users").append(userListItem);
+
+          const userListItems = onlineUsers.map((user) => {
+            const item = $("<li></li>");
+            item.text(user);
+            item.attr("id", `user-${user}`);
+            return item;
+          });
+
+          $("#online-users").empty().append(userListItems);
+        });
+
+        socket.on("user left", function (data) {
+          const { username, onlineUsers } = data;
+          $(`#user-${username}`).remove();
+
+          const userListItems = onlineUsers.map((user) => {
+            const item = $("<li></li>");
+            item.text(user);
+            item.attr("id", `user-${user}`);
+            return item;
+          });
+
+          $("#online-users").empty().append(userListItems);
+        });
+      });
+    </script>
+  </body>
+</html>
